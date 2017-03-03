@@ -1,7 +1,7 @@
 #pragma once
 
 #include <mutex>
-
+#include <iostream>
 using namespace std;
 
 class RWLock {
@@ -12,23 +12,44 @@ class RWLock {
 
 public:
 	size_t getReaders() const {
-		// TODO
-		return 0;
+		return m_readLocked;
 	}
 
 	void lockR() {
-		// TODO
+		{
+			unique_lock<std::mutex> monitor(m_mutex);
+			m_readingAllowed.wait(monitor, [this]() {return !m_writeLocked;});
+			m_readLocked++;
+		}
 	}
 
 	void unlockR() {
-		// TODO
+		{
+			unique_lock<std::mutex> monitor(m_mutex);
+			//technically not needed, but if this is not the case then somebody could decrease m_readLocked while it is currently locked for writing
+			m_readingAllowed.wait(monitor, [this]() {return !m_writeLocked;});
+			m_readLocked--;
+			if (m_readLocked == 0) {
+				m_writingAllowed.notify_one();
+			}
+			
+		}
 	}
 
 	void lockW() {
-		// TODO
+		{
+			unique_lock<std::mutex> monitor(m_mutex);
+			m_writingAllowed.wait(monitor, [this]() {return this->m_readLocked == 0 && !this->m_writeLocked;});
+			m_writeLocked = true;
+		}
 	}
 
 	void unlockW() {
-		// TODO
+		{
+			unique_lock<std::mutex> monitor(m_mutex);
+			m_writeLocked = false;
+			m_writingAllowed.notify_one();
+			m_readingAllowed.notify_all();
+		}
 	}
 };

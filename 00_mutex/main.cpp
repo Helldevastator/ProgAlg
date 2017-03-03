@@ -20,7 +20,7 @@ int main() {
 
 		for (int i = 0; i < nRuns; i++) {
 			if (i & 1) {
-				const double amount = rand()*1000/RAND_MAX;
+				const double amount = 500;//rand()*1000/RAND_MAX;
 				const double b = unsynchronizedAccount + amount;
 				account.deposit(amount);
 				unsynchronizedAccount = b;
@@ -30,8 +30,8 @@ int main() {
 			}
 			const double balance = account.getBalance();
 			mtx.lock();
-			cout << "thread " << this_thread::get_id() << ": balance is = " << balance << ", unsychronized balance is = " << unsynchronizedAccount << endl;
-			cout << "concurrent readers: " << account.getReaders() << endl;
+			//cout << "thread " << this_thread::get_id() << ": balance is = " << balance << ", unsychronized balance is = " << unsynchronizedAccount << endl;
+			//cout << "concurrent readers: " << account.getReaders() << endl;
 			mtx.unlock();
 		}
 	};
