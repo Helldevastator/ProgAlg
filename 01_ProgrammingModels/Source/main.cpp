@@ -3,5 +3,5 @@ void summation();
 
 int main(int argc, const char* argv[]) {
 	imageProcessing(argc, argv);
-	summation();
+	//summation();
 }

@@ -1,19 +1,22 @@
 #include <iostream>
 #include <omp.h>
 #include "Stopwatch.h"
+#include <mutex>
+#include "math.h"
+
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Explicit computation
 static long long sum(const long long n) {
-	return n*(n + 1)/2;
+	return n*(n + 1) / 2;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Sequential summation
 long long sumSerial(const int n) {
 	long long sum = 0;
-	for (int i=1; i <= n; i++) {
+	for (int i = 1; i <= n; i++) {
 		sum += i;
 	}
 	return sum;
@@ -22,29 +25,55 @@ long long sumSerial(const int n) {
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Parallel summation with critical section
 static long long sumPar1(const int n) {
-	// TODO
-	return 0;
+	long long sum = 0;
+#pragma omp parallel for default(none) shared(sum)
+	for (int i = 1; i <= n; i++) {
+		sum += i;
+	}
+
+	return sum;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Parallel summation with atomic access
 static long long sumPar2(const int n) {
-	// TODO
-	return 0;
+	long long sum = 0;
+#pragma omp parallel for default(none) shared(sum) num_threads(8) schedule(guided)
+	for (int i = 1; i <= n; i++) {
+#pragma omp atomic
+		{
+			sum += i;
+		}
+	}
+	return sum;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Parallel summation with reduction
 static long long sumPar3(const int n) {
-	// TODO
-	return 0;
+	long long sum = 0;
+
+#pragma omp parallel for default(none) reduction(+: sum) num_threads(8) schedule(guided)
+	for (int i = 1; i <= n; i++) {
+		sum += i;
+	}
+	return sum;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Parallel summation with explicit locks
 static long long sumPar4(const int n) {
-	// TODO
-	return 0;
+	mutex m;
+	long long sum = 0;
+
+#pragma omp parallel for default(none) shared(sum,m) num_threads(8) schedule(guided)
+	for (int i = 1; i <= n; i++) {
+		m.lock();
+		sum += i;
+		m.unlock();
+	}
+
+	return sum;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +81,7 @@ static long long sumPar4(const int n) {
 void summation() {
 	cout << "\nSummation Tests" << endl;
 
-	const int64_t N = 10000000;
+	const int64_t N = 50000000;
 	Stopwatch sw;
 
 	sw.Start();

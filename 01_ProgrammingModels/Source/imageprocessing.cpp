@@ -23,6 +23,18 @@ typedef struct tagRGBQUAD {
 */
 #endif
 
+typedef struct TempPixel {
+	int blue;
+	int green;
+	int red;
+
+	void copy(const TempPixel& pixel) {
+		blue = pixel.blue;
+		green = pixel.green;
+		red = pixel.red;
+	}
+};
+
 ////////////////////////////////////////////////////////////////////////
 static BYTE dist(int x, int y) {
 	int d = (int)sqrt(x*x + y*y);
@@ -66,18 +78,115 @@ static void processSerial(const fipImage& input, fipImage& output) {
 				}
 			}
 			RGBQUAD oC = { dist(hC[0], vC[0]), dist(hC[1], vC[1]), dist(hC[2], vC[2]), 255 };
+			//RGBQUAD oC = { vC[0], vC[1], vC[2], 255 };
 			output.setPixelColor(u, v, &oC);
 		}
 	}
 }
 
+
+static void DoHorizontalFilter(BYTE * ptrLastLine, BYTE * ptrNextLine, TempPixel & pixel) {
+	pixel.blue = *ptrLastLine - *ptrNextLine;
+	pixel.green = *(ptrLastLine + 1) - *(ptrNextLine + 1);
+	pixel.red = *(ptrLastLine + 2) - *(ptrNextLine + 2);
+}
+
+static void DoVerticalSum(BYTE * ptrLastLine, BYTE * currentLine, BYTE * ptrNextLine, TempPixel & pixel) {
+	pixel.blue = *ptrLastLine + *currentLine + *ptrNextLine;
+	pixel.green = *(ptrLastLine + 1) + *(currentLine + 1) + *(ptrNextLine + 1);
+	pixel.red = *(ptrLastLine + 2) + *(currentLine + 2) + *(ptrNextLine + 2);
+}
 ////////////////////////////////////////////////////////////////////////
 static void processSerialOpt(const fipImage& input, fipImage& output) {
 	const int bypp = 4;
 	assert(input.getWidth() == output.getWidth() && input.getHeight() == output.getHeight() && input.getImageSize() == output.getImageSize());
 	assert(input.getBitsPerPixel() == bypp*8);
 
-	// TODO
+	const int fSize = 3;
+	const int fSize2 = fSize / 2;
+	const int hFilter[][fSize] = {
+		{ 1, 1, 1 },
+		{ 0, 0, 0 },
+		{ -1,-1,-1 }
+	};
+	const int vFilter[][fSize] = {
+		{ 1, 0,-1 },
+		{ 1, 0,-1 },
+		{ 1, 0,-1 }
+	};
+
+	TempPixel sumLast;
+	TempPixel sumCurrent;
+	TempPixel sumNext;
+	//hfilter
+	for (unsigned int v = fSize2; v < output.getHeight() - fSize2; v++) {
+		BYTE * lineBefore = input.getScanLine(v - fSize2);
+		BYTE * nextLine = input.getScanLine(v + fSize2);
+		BYTE * currentResult = output.getScanLine(v);
+
+		DoHorizontalFilter(lineBefore, nextLine, sumLast);
+		lineBefore += 4;nextLine += 4;
+		DoHorizontalFilter(lineBefore, nextLine, sumCurrent);
+		lineBefore += 4;nextLine += 4;
+		currentResult += 4;
+
+		//horizontal
+		for (unsigned int u = fSize2 + fSize2; u < output.getWidth(); u++) {
+			DoHorizontalFilter(lineBefore, nextLine, sumNext);
+			lineBefore += 4;nextLine += 4;
+
+			*currentResult = sumLast.blue + sumCurrent.blue + sumNext.blue; 
+			*(++currentResult) = sumLast.green + sumCurrent.green + sumNext.green;
+			*(++currentResult) = sumLast.red + sumCurrent.red + sumNext.red;
+			currentResult += 2;
+
+			sumLast.copy(sumCurrent);
+			sumCurrent.copy(sumNext);
+		}
+	}
+
+	//vFilter
+	for (unsigned int v = fSize2; v < output.getHeight() - fSize2; v++) {
+		BYTE * beforeLine = input.getScanLine(v - fSize2);
+		BYTE * currentLine = input.getScanLine(v);
+		BYTE * nextLine = input.getScanLine(v + fSize2);
+		BYTE * currentResult = output.getScanLine(v);
+
+		DoVerticalSum(beforeLine, currentLine, nextLine, sumLast);
+		beforeLine += 4; currentLine += 4; nextLine += 4;
+		DoVerticalSum(beforeLine, currentLine, nextLine, sumCurrent);
+		beforeLine += 4; currentLine += 4; nextLine += 4;
+		currentResult += 4;
+		for (unsigned int u = fSize2 + fSize2; u < output.getWidth(); u++) {
+			DoVerticalSum(beforeLine, currentLine, nextLine, sumNext);
+			beforeLine += 4; currentLine += 4; nextLine += 4;
+			
+			//combine results
+			BYTE tmp = *currentResult;
+			*currentResult = dist(tmp, sumLast.blue - sumNext.blue);currentResult++;
+			tmp = *currentResult;
+			*currentResult = dist(tmp, sumLast.green - sumNext.green);currentResult++;
+			tmp = *currentResult;
+			*currentResult = dist(tmp, sumLast.red - sumNext.red);currentResult++;
+			tmp = *currentResult;
+			*currentResult = 255;currentResult++;
+			
+
+
+				/*
+			*currentResult =  sumLast.blue - sumNext.blue;currentResult++;
+			*currentResult = sumLast.green - sumNext.green;currentResult++;
+			*currentResult = sumLast.red - sumNext.red;currentResult++;
+			*currentResult = 255;currentResult++;
+			*/
+			
+
+
+			sumLast.copy(sumCurrent);
+			sumCurrent.copy(sumNext);
+		}
+	}
+	
 }
 
 ////////////////////////////////////////////////////////////////////////
