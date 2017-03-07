@@ -28,3 +28,12 @@
 *.out
 *.app
 *.VC.db
+01_ProgrammingModels/Tests/image.PNG
+*.db
+*.ilk
+*.log
+*.pdb
+*.tlog
+*.lastbuildstate
+*.idb
+*.opendb
