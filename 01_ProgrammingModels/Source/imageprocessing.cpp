@@ -41,6 +41,10 @@ static BYTE dist(int x, int y) {
 	return (d < 256) ? d : 255;
 }
 
+static BYTE kd(int d) {
+	return (d < 256) ? d : 255;
+}
+
 ////////////////////////////////////////////////////////////////////////
 static void processSerial(const fipImage& input, fipImage& output) {
 	assert(input.getWidth() == output.getWidth() && input.getHeight() == output.getHeight() && input.getImageSize() == output.getImageSize());
@@ -78,7 +82,8 @@ static void processSerial(const fipImage& input, fipImage& output) {
 				}
 			}
 			RGBQUAD oC = { dist(hC[0], vC[0]), dist(hC[1], vC[1]), dist(hC[2], vC[2]), 255 };
-			//RGBQUAD oC = { vC[0], vC[1], vC[2], 255 };
+			//RGBQUAD oC = { kd(vC[0]), kd(vC[1]), kd(vC[2]), 255 };
+			//RGBQUAD oC = { kd(hC[0]), kd(hC[1]), kd(hC[2]), 255 };
 			output.setPixelColor(u, v, &oC);
 		}
 	}
@@ -115,78 +120,58 @@ static void processSerialOpt(const fipImage& input, fipImage& output) {
 		{ 1, 0,-1 }
 	};
 
-	TempPixel sumLast;
-	TempPixel sumCurrent;
-	TempPixel sumNext;
+	TempPixel sumLastH;
+	TempPixel sumCurrentH;
+	TempPixel sumNextH;
+	TempPixel sumLastV;
+	TempPixel sumCurrentV;
+	TempPixel sumNextV;
 	//hfilter
-	for (unsigned int v = fSize2; v < output.getHeight() - fSize2; v++) {
-		BYTE * lineBefore = input.getScanLine(v - fSize2);
-		BYTE * nextLine = input.getScanLine(v + fSize2);
-		BYTE * currentResult = output.getScanLine(v);
-
-		DoHorizontalFilter(lineBefore, nextLine, sumLast);
-		lineBefore += 4;nextLine += 4;
-		DoHorizontalFilter(lineBefore, nextLine, sumCurrent);
-		lineBefore += 4;nextLine += 4;
-		currentResult += 4;
-
-		//horizontal
-		for (unsigned int u = fSize2 + fSize2; u < output.getWidth(); u++) {
-			DoHorizontalFilter(lineBefore, nextLine, sumNext);
-			lineBefore += 4;nextLine += 4;
-
-			*currentResult = sumLast.blue + sumCurrent.blue + sumNext.blue; 
-			*(++currentResult) = sumLast.green + sumCurrent.green + sumNext.green;
-			*(++currentResult) = sumLast.red + sumCurrent.red + sumNext.red;
-			currentResult += 2;
-
-			sumLast.copy(sumCurrent);
-			sumCurrent.copy(sumNext);
-		}
-	}
-
-	//vFilter
 	for (unsigned int v = fSize2; v < output.getHeight() - fSize2; v++) {
 		BYTE * beforeLine = input.getScanLine(v - fSize2);
 		BYTE * currentLine = input.getScanLine(v);
 		BYTE * nextLine = input.getScanLine(v + fSize2);
 		BYTE * currentResult = output.getScanLine(v);
 
-		DoVerticalSum(beforeLine, currentLine, nextLine, sumLast);
+		DoHorizontalFilter(beforeLine, nextLine, sumLastH);
+		DoVerticalSum(beforeLine, currentLine, nextLine, sumLastV);
 		beforeLine += 4; currentLine += 4; nextLine += 4;
-		DoVerticalSum(beforeLine, currentLine, nextLine, sumCurrent);
+
+		DoHorizontalFilter(beforeLine, nextLine, sumCurrentH);
+		DoVerticalSum(beforeLine, currentLine, nextLine, sumCurrentV);
 		beforeLine += 4; currentLine += 4; nextLine += 4;
 		currentResult += 4;
+
+		//horizontal
 		for (unsigned int u = fSize2 + fSize2; u < output.getWidth(); u++) {
-			DoVerticalSum(beforeLine, currentLine, nextLine, sumNext);
+			DoHorizontalFilter(beforeLine, nextLine, sumNextH);
+			DoVerticalSum(beforeLine, currentLine, nextLine, sumNextV);
 			beforeLine += 4; currentLine += 4; nextLine += 4;
+
+			*currentResult = dist(sumLastH.blue + sumCurrentH.blue + sumNextH.blue, sumLastV.blue - sumNextV.blue);currentResult++;
+			*currentResult = dist(sumLastH.green + sumCurrentH.green + sumNextH.green, sumLastV.green - sumNextV.green);currentResult++;
+			*currentResult = dist(sumLastH.red + sumCurrentH.red + sumNextH.red, sumLastV.red - sumNextV.red);currentResult++;
+			*currentResult = 255;currentResult++;
 			
-			//combine results
-			BYTE tmp = *currentResult;
-			*currentResult = dist(tmp, sumLast.blue - sumNext.blue);currentResult++;
-			tmp = *currentResult;
-			*currentResult = dist(tmp, sumLast.green - sumNext.green);currentResult++;
-			tmp = *currentResult;
-			*currentResult = dist(tmp, sumLast.red - sumNext.red);currentResult++;
-			tmp = *currentResult;
+			/*
+			*currentResult = kd(sumLastH.blue + sumCurrentH.blue + sumNextH.blue);currentResult++;
+			*currentResult = kd(sumLastH.green + sumCurrentH.green + sumNextH.green);currentResult++;
+			*currentResult = kd(sumLastH.red + sumCurrentH.red + sumNextH.red);currentResult++;
 			*currentResult = 255;currentResult++;
 			
 
+			*currentResult = kd(sumLastV.blue - sumNextV.blue);currentResult++;
+			*currentResult = kd(sumLastV.green - sumNextV.green);currentResult++;
+			*currentResult = kd(sumLastV.red - sumNextV.red);currentResult++;
+			*currentResult = 255;currentResult++;*/
 
-				/*
-			*currentResult =  sumLast.blue - sumNext.blue;currentResult++;
-			*currentResult = sumLast.green - sumNext.green;currentResult++;
-			*currentResult = sumLast.red - sumNext.red;currentResult++;
-			*currentResult = 255;currentResult++;
-			*/
-			
+			sumLastH.copy(sumCurrentH);
+			sumCurrentH.copy(sumNextH);
 
-
-			sumLast.copy(sumCurrent);
-			sumCurrent.copy(sumNext);
+			sumLastV.copy(sumCurrentV);
+			sumCurrentV.copy(sumNextV);
 		}
 	}
-	
 }
 
 ////////////////////////////////////////////////////////////////////////
