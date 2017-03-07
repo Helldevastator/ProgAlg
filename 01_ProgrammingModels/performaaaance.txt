@@ -1,0 +1,5 @@
+
+
+version 0, no optimiyation 11601.8 ms.
+version 1, rigorous optimization for speed9800
+version 2, wooop wooop> 434
