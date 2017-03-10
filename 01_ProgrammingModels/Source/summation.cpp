@@ -26,7 +26,7 @@ long long sumSerial(const int n) {
 // Parallel summation with critical section
 static long long sumPar1(const int n) {
 	long long sum = 0;
-#pragma omp parallel for default(none) shared(sum)
+	#pragma omp parallel for default(none) shared(sum)
 	for (int i = 1; i <= n; i++) {
 		sum += i;
 	}
@@ -38,12 +38,11 @@ static long long sumPar1(const int n) {
 // Parallel summation with atomic access
 static long long sumPar2(const int n) {
 	long long sum = 0;
-#pragma omp parallel for default(none) shared(sum) num_threads(8) schedule(guided)
+	#pragma omp parallel for default(none) shared(sum) num_threads(8) schedule(guided)
 	for (int i = 1; i <= n; i++) {
-#pragma omp atomic
-		{
-			sum += i;
-		}
+		#pragma omp atomic
+		sum += i;
+		
 	}
 	return sum;
 }
